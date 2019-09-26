@@ -207,3 +207,32 @@ Multus is a _meta_ CNI (Container Network Interface) plugin for Kubernetes that 
 * Hands on Kubevirt
 .background img/background.png
 
+
+* Hands on Kubevirt
+
+Let's do some assumption:
+
+- We have a K8s Cluster up and Running....ok if not just put this:
+    # GO111MODULE="on" go get sigs.k8s.io/kind@v0.5.1 && kind create cluster
+    # export KUBECONFIG="$(kind get kubeconfig-path --name="kind")"
+- We have already a SC pre-defined on the cluster and as a default one, let put it as a non default in order to let _hostpath_provisioner_ to do this job:
+	#   kubectl patch storageclass standard -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}'
+- Now it's time to install Kubevirt...
+.background img/background.png
+
+
+* Hands on Kubevirt
+- Execute those commands in order to install Kubevirt
+.code samples/install-kubevirt.sh
+- Check how it's going...
+	# kubectl get pods -n kubevirt
+.image img/pods_kubevirt.png
+.background img/background.png
+
+* Hands on Kubevirt
+Ok now we have Kubevirt installed and working.
+
+- Let's install CDI
+.code samples/install-cdi.sh
+.background img/background.png
+
