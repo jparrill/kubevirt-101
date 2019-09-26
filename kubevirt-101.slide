@@ -11,7 +11,6 @@ https://github.com/jparrill/kubevirt-101
 
 * About me
 
-
 - Programming enthusiast
 - Redhatter (~5 years)
 - Openshift/Kubernetes Lover
@@ -19,6 +18,18 @@ https://github.com/jparrill/kubevirt-101
 .image img/avatar.jpg _ 250
 .caption [[https://github.com/jparrill/kubevirt-101][Kubevirt 101]] by Juan Manuel Parrilla
 .background img/background.png
+
+* Index
+
+- What is Kubevirt
+- Briefly Pod/Containers basics
+- Kubevirt Architecture
+- Kubevirt Components
+- Kubevirt Additional components
+- Hands on Kubevirt
+
+.background img/background.png
+
 
 * Prologue
 .background img/background.png
@@ -213,10 +224,10 @@ Multus is a _meta_ CNI (Container Network Interface) plugin for Kubernetes that 
 Let's do some assumption:
 
 - We have a K8s Cluster up and Running....ok if not just put this:
-    # GO111MODULE="on" go get sigs.k8s.io/kind@v0.5.1 && kind create cluster
-    # export KUBECONFIG="$(kind get kubeconfig-path --name="kind")"
+    GO111MODULE="on" go get sigs.k8s.io/kind@v0.5.1 && kind create cluster
+    export KUBECONFIG="$(kind get kubeconfig-path --name="kind")"
 - We have already a SC pre-defined on the cluster and as a default one, let put it as a non default in order to let _hostpath_provisioner_ to do this job:
-	#   kubectl patch storageclass standard -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}'
+	kubectl patch storageclass standard -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}'
 - Now it's time to install Kubevirt...
 .background img/background.png
 
@@ -234,5 +245,49 @@ Ok now we have Kubevirt installed and working.
 
 - Let's install CDI
 .code samples/install-cdi.sh
+- Check how it's going...
+	# kubectl get pods -n cdi
+.background img/background.png
+
+* Hands on Kubevirt
+- This is how should looks like 
+.image img/pods_cdi.png
+Once both are installed we will create a PVC which will use CDI to import a cirros image into it:
+.code -edit samples/use-cdi.sh /^# Import/,/cirros-pvc.yaml/ 
+- This is how looks like the importation process:
+.image img/pod_import.png
+.background img/background.png
+
+* Hands on Kubevirt
+- And this is the importer pod's log:
+.code samples/cdi_import.log
+.background img/background.png
+
+
+* Hands on Kubevirt
+- Now we need to create the VM:
+.code -edit samples/use-cdi.sh /^# Create/,/cirros-vm.yaml/ 
+- And this is how looks like the VM process:
+    NAME                            READY   STATUS    RESTARTS   AGE
+    virt-launcher-vm-cirros-p68f5   0/1     Running   0          10s
+
+- VM:
+    NAME        AGE     RUNNING   VOLUME
+    vm-cirros   3m38s   true      
+
+
+- VMI:
+    NAME        AGE     PHASE     IP            NODENAME
+    vm-cirros   3m10s   Running   10.244.0.21   kind-control-plane
+
+.background img/background.png
+
+* Hands on Kubevirt
+Testing Multus:
+
+- Install OpenVSwitch on Kind:
+
+    # sudo dnf install openvswitch -y
+    # sudo systemctl enable --now openvswitch
 .background img/background.png
 
