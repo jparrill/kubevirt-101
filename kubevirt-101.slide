@@ -25,8 +25,10 @@ https://github.com/jparrill/kubevirt-101
 - Briefly Pod/Containers basics
 - Kubevirt Architecture
 - Kubevirt Components
-- Kubevirt Additional components
-- Hands on Kubevirt
+- Kubevirt External components
+- Hands on Kubevirt, CDI and Multus
+- Understanding Kubevirt Networking
+- Understanding Kubevirt Storage
 
 .background img/background.png
 
@@ -219,20 +221,22 @@ Multus is a _meta_ CNI (Container Network Interface) plugin for Kubernetes that 
 .background img/background.png
 
 
-* Hands on Kubevirt
+* Hands on Kubevirt: K8s
 
 Let's do some assumption:
 
-- We have a K8s Cluster up and Running....ok if not just put this:
-    GO111MODULE="on" go get sigs.k8s.io/kind@v0.5.1 && kind create cluster
+- We have a K8s Cluster up and Running....ok if not just put this (manifests in sample folder):
+    GO111MODULE="on" go get sigs.k8s.io/kind@v0.5.1 && kind create cluster --config=samples/kind/kind.yaml
     export KUBECONFIG="$(kind get kubeconfig-path --name="kind")"
+- Let's wait until `coredns` pod stays on pending state and then execute this:
+    kubectl create -f samples/kind/kube-flannel.yaml
 - We have already a SC pre-defined on the cluster and as a default one, let put it as a non default in order to let _hostpath_provisioner_ to do this job:
-	kubectl patch storageclass standard -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}'
+    kubectl patch storageclass standard -p '{"metadata": {"annotations":{"storageclass.beta.kubernetes.io/is-default-class":"false"}}}'
 - Now it's time to install Kubevirt...
 .background img/background.png
 
 
-* Hands on Kubevirt
+* Hands on Kubevirt: Kubevirt
 - Execute those commands in order to install Kubevirt
 .code samples/install-kubevirt.sh
 - Check how it's going...
@@ -240,7 +244,7 @@ Let's do some assumption:
 .image img/pods_kubevirt.png
 .background img/background.png
 
-* Hands on Kubevirt
+* Hands on Kubevirt: CDI
 Ok now we have Kubevirt installed and working.
 
 - Let's install CDI
@@ -249,22 +253,22 @@ Ok now we have Kubevirt installed and working.
 	# kubectl get pods -n cdi
 .background img/background.png
 
-* Hands on Kubevirt
-- This is how should looks like 
+* Hands on Kubevirt: CDI
+- This is how should looks like the pods 
 .image img/pods_cdi.png
 Once both are installed we will create a PVC which will use CDI to import a cirros image into it:
 .code -edit samples/use-cdi.sh /^# Import/,/cirros-pvc.yaml/ 
-- This is how looks like the importation process:
+- This is the importation process:
 .image img/pod_import.png
 .background img/background.png
 
-* Hands on Kubevirt
+* Hands on Kubevirt: CDI
 - And this is the importer pod's log:
 .code samples/cdi_import.log
 .background img/background.png
 
 
-* Hands on Kubevirt
+* Hands on Kubevirt: VMs
 - Now we need to create the VM:
 .code -edit samples/use-cdi.sh /^# Create/,/cirros-vm.yaml/ 
 - And this is how looks like the VM process:
@@ -282,12 +286,151 @@ Once both are installed we will create a PVC which will use CDI to import a cirr
 
 .background img/background.png
 
-* Hands on Kubevirt
-Testing Multus:
+* Hands on Kubevirt: Multus
 
-- Install OpenVSwitch on Kind:
+In order to work with multus we need to understand a couple of things about our platform (Kind) and how it works by default. 
 
-    # sudo dnf install openvswitch -y
-    # sudo systemctl enable --now openvswitch
+Kind works with a net plugin called Kindnet and it's not compatible directly with multus, in order to fix this, we need to raise up a kind cluster without Network config, and once booted up, install flannel as we did before. 
+
+This way Flannel could use Multus as CNI without compatibility problems.
+
+.image img/cni-logo.png _ 250
 .background img/background.png
 
+* Hands on Kubevirt: Multus
+Testing Multus (manifests on _samples/cnao_ folder):
+
+- Install the necessary elements to make the operator works:
+.code -edit samples/install-cnao.sh /^# Install/,/operator.yaml/ 
+
+- Deploy the CR with Network Addons configuration:
+.code -edit samples/install-cnao.sh /^# Deploy/,/cr.yaml/ 
+
+- This should be the final shape:
+.image img/cnao_pods.png
+.background img/background.png
+
+* Hands on Kubevirt: Multus
+Now we need to tweak a bit the control plane node and also the DaemonSet in order to make Multus work fine with Kind (by default it's not prepared for debian based OS):
+
+- We need to get inside the docker container and install OVS
+    docker exec -it kind-control-plane /bin/bash
+    apt update -y
+    apt install openvswitch-common openvswitch-switch -y
+    systemctl start openvswitch-switch
+
+- Now we need to patch ovs-cni-amd64 DS
+    kubectl edit ds -n cluster-network-addons ovs-cni-amd64
+
+- Introduce this changes:
+
+    path: /run/openvswitch                ->  path: /var/run/openvswitch
+    mountPath: /host/run/openvswitch      ->  mountPath: /var/run/openvswitch
+    unix:///host/run/openvswitch/db.sock  ->  /var/run/openvswitch/db.sock
+
+.background img/background.png
+
+* Hands on Kubevirt: Multus
+Once the DS is patched, the pod will be terminated and the new version will raise up, now we need to create a BR manually because Kind image has not NetworkManager that nmstate operator could handle:
+    docker exec -it kind-control-plane /bin/bash
+    ovs-vsctl add-br br1
+    exit
+
+- Once BR is deployed on Kind host, let's create a the NetworkAttachementDefinition:
+    kubectl create -f sample/multus/multus_nad_br1.yaml
+
+- And now a couple of VMs with multiples interfaces:
+    kubectl create -f sample/multus/vm_multus1.yaml
+    kubectl create -f sample/multus/vm_multus2.yaml
+.background img/background.png
+
+* Hands on Kubevirt: Multus
+
+Those are the pods:
+
+    NAME                                  READY   STATUS    RESTARTS   AGE
+    virt-launcher-fedora-multus-1-776r9   2/2     Running   0          23m
+    virt-launcher-fedora-multus-2-8jmtw   2/2     Running   0          2m18s
+
+- You could use _krew_ to login into one of them, and then see the interfaces
+    kubectl virt console fedora-multus-2
+
+- Output:
+    Fedora 29 (Cloud Edition)
+    Kernel 4.18.16-300.fc29.x86_64 on an x86_64 (ttyS0)
+    
+    fedora-multus-2 login: fedora
+    Password: 
+    Last login: Fri Sep 27 14:31:15 on ttyS0
+    [fedora@fedora-multus-2 ~]$ ip -o a | grep eth1
+    3: eth1    inet 11.0.0.6/24 brd 11.0.0.255 scope global noprefixroute eth1
+    3: eth1    inet6 fe80::feb4:3fee:a063:b595/64 scope link noprefixroute
+.background img/background.png
+
+
+* Hands on Kubevirt: Multus
+
+- This is the communication between both machines
+    [fedora@fedora-multus-2 ~]$ ping 11.0.0.6 -c2         # Ping to myself
+    PING 11.0.0.6 (11.0.0.6) 56(84) bytes of data.
+    64 bytes from 11.0.0.6: icmp_seq=1 ttl=64 time=0.047 ms
+    64 bytes from 11.0.0.6: icmp_seq=2 ttl=64 time=0.112 ms
+    
+    --- 11.0.0.6 ping statistics ---
+    2 packets transmitted, 2 received, 0% packet loss, time 3ms
+    rtt min/avg/max/mdev = 0.047/0.079/0.112/0.033 ms
+
+    [fedora@fedora-multus-2 ~]$ ping 11.0.0.5 -c2         # Ping to my neighbour
+    PING 11.0.0.5 (11.0.0.5) 56(84) bytes of data.
+    64 bytes from 11.0.0.5: icmp_seq=1 ttl=64 time=0.952 ms
+    64 bytes from 11.0.0.5: icmp_seq=2 ttl=64 time=0.435 ms
+    
+    --- 11.0.0.5 ping statistics ---
+    2 packets transmitted, 2 received, 0% packet loss, time 3ms
+    rtt min/avg/max/mdev = 0.435/0.693/0.952/0.259 ms
+.background img/background.png
+
+* Understanding Networking
+
+- Why we did all of this stuff just to communicate 2 VMs?
+- Why not use just Kindnet or flannel?
+- How Network Cluster Addons Operator could help me?
+.image img/question-img.png _ 550
+.background img/background.png
+
+
+* Understanding Networking
+If you just limit yourself to use Kindnet or Flannel you will miss many features that Multus could give, for instance, multi-network card per pod, this is extensible also for every pod, not just VMs.
+
+This also allows you to use w/e plugin compatible with CNI, you just need to tell multus that it needs to be managed with the proper manifest.
+
+The final architecture that we have in our deployment is the next:
+
+    - Flannel (as K8s default SDN)
+    - Multus (as additional CNI Plugin)
+    - Openvswitch (as a plugin connected to Multus)
+    - Linux Bridge (as a plugin connected to Multus)
+    - NMState (as a plugin connected to Multus, but not used)
+    - Bridge Maker (as a plugin connected to Multus, but not used)
+
+.background img/background.png
+
+
+* Understanding Networking
+
+Network Cluster Addons Operator will help you:
+
+- Installing all the necessary plugins that Multus will need for cni (like ovs-vsctl to manage openvswitch bridges)
+- Creating host elements but just defined through CR's
+- It has some requirements like NetworkManager or others depending on the plugin (OVS needs openvswitch up and running)
+
+.image img/network-logo.png _ 550
+
+.background img/background.png
+
+
+* Understanding Storage
+
+In this case, CDI takes care about the storage part in a non-production way, if we want to deal with a real environment we need to work with [[https://rook.io][Rook]]
+
+.background img/background.png
