@@ -425,12 +425,65 @@ Network Cluster Addons Operator will help you:
 - It has some requirements like NetworkManager or others depending on the plugin (OVS needs openvswitch up and running)
 
 .image img/network-logo.png _ 550
-
 .background img/background.png
 
 
 * Understanding Storage
 
-In this case, CDI takes care about the storage part in a non-production way, if we want to deal with a real environment we need to work with [[https://rook.io][Rook]]
+In our case, CDI takes care about the storage part with a hostpath provisioner (just for development), if we want to deal with a real environment we need to work with [[https://rook.io][Rook]] and using [[https://rook.io/docs/rook/v1.1/ceph-quickstart.html][Ceph as a Backend]].
+
+Here what k8s provides:
+
+- Filesystem support (kubelet provides volumes mounted in specific folders
+- Block device support (kubelet provides block devices in /dev/ inside the container)
+- Support for arbitrary storage providers via CSI (Container Storage Interface)
+
+We only attach images in folders or block devices in /dev/ in the container to qemu.
+
+.background img/background.png
+
+
+* References
+
+*Kubevirt:*
+
+- [[http://kubevirt.io/][Kubevirt.io]]
+- [[https://github.com/kubevirt/kubevirt/blob/master/docs/components.md][Kubevirt VM Creation Flow]]
+- [[https://github.com/kubevirt/kubevirtci][KubevirtCI]]
+- [[https://github.com/kubevirt/kubevirt/tree/master/pkg/virt-operator][Kubevirt Operator]]
+- [[https://github.com/kubevirt/kubevirt-tutorial][Kubevirt Tutorial]]
+- [[https://github.com/kubevirt/hyperconverged-cluster-operator][HCO]]
+- [[https://kubevirt.io/user-guide/docs/latest/welcome/index.html][Kubevirt Documentation]]
+
+.background img/background.png
+
+* References
+
+*CDI*:
+
+- [[https://github.com/kubevirt/containerized-data-importer][CDI]]
+- [[https://kubevirt.io/2018/containerized-data-importer.html][CDI - How to]]
+- [[https://kubevirt.io/labs/kubernetes/lab2][CDI Laboratory]]
+
+*Multus*
+
+- [[https://kubevirt.io/2018/attaching-to-multiple-networks.html][Multus - How to]]
+- [[https://github.com/kubevirt/ovs-cni][OVS-CNI Plugin]]
+- [[https://github.com/kubevirt/cluster-network-addons-operator][Cluster Network Addons Operator]]
+
+.background img/background.png
+
+* References
+
+*Rook*
+
+- [[https://rook.io/][Rook]]
+- [[https://rook.io/docs/rook/v1.1/ceph-quickstart.html][Rook Quickstart]]
+- [[https://ember-csi.ioo][EmberCSI]]
+
+*K8s*
+
+- [[https://github.com/kubernetes-sigs/krew/][Krew]]
+- [[https://github.com/kubernetes-sigs/kind][Kind]]
 
 .background img/background.png
