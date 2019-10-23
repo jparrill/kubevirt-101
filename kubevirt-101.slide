@@ -337,6 +337,7 @@ Now we need to tweak a bit the control plane node and also the DaemonSet in orde
 
 * Hands on Kubevirt: Multus
 Once the DS is patched, the pod will be terminated and the new version will raise up, now we need to create a BR manually because Kind image has not NetworkManager that nmstate operator could handle:
+    
     docker exec -it kind-control-plane /bin/bash
     ovs-vsctl add-br br1
     exit
