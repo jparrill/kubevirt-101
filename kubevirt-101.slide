@@ -30,7 +30,7 @@ https://github.com/jparrill/kubevirt-101
 - Briefly Pod/Containers basics
 - Kubevirt Architecture
 - Kubevirt Components
-- Kubevirt External components
+- Kubevirt External Components
 - Hands on Kubevirt, CDI, Multus and Rook
 - Understanding Kubevirt Networking
 - Understanding Kubevirt Storage
@@ -133,6 +133,11 @@ We don’t have to trick libvirt or Kubernetes then in any way:
 .background img/background.png
 
 * Kubevirt Components
+.background img/background.png
+
+
+* Kubevirt Components Interaction
+.image img/kubevirt-components.png _ 900
 .background img/background.png
 
 * virt-api-server
