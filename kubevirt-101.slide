@@ -173,15 +173,6 @@ A VMI object will always be associated to a pod during it's life-time, however, 
 
 .background img/background.png
 
-
-* virt-launcher
-The main purpose of the virt-launcher Pod is to provide the cgroups and namespaces, which will be used to host the VMI process.
-
-virt-handler signals virt-launcher to start a VMI by passing the VMI's CRD object to virt-launcher. virt-launcher then uses a local libvirtd instance within its container to start the VMI. From there virt-launcher monitors the VMI process and terminates once the VMI has exited.
-
-.background img/background.png
-
-
 * virt-handler
 Every host needs a single instance of virt-handler. It can be delivered as a DaemonSet.
 
@@ -192,6 +183,15 @@ Like the virt-controller, the virt-handler is also reactive and is watching for 
 - Invoke node-centric plugins which can fulfill networking and storage requirements defined in VMI specs.
 
 .background img/background.png
+
+
+* virt-launcher
+The main purpose of the virt-launcher Pod is to provide the cgroups and namespaces, which will be used to host the VMI process.
+
+virt-handler signals virt-launcher to start a VMI by passing the VMI's CRD object to virt-launcher. virt-launcher then uses a local libvirtd instance within its container to start the VMI. From there virt-launcher monitors the VMI process and terminates once the VMI has exited.
+
+.background img/background.png
+
 
 * libvirtd
 An instance of libvirtd is present in every VMI pod. virt-launcher uses libvirtd to manage the life-cycle of the VMI process.
