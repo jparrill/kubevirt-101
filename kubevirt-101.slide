@@ -235,7 +235,7 @@ Multus is a _meta_ CNI (Container Network Interface) plugin for Kubernetes that 
 
 Let's do some assumption:
 
-- We have a K8s Cluster up and Running....ok if not just put this (manifests in sample folder):
+- We have a K8s Cluster up and Running....ok if not just write down this command (all the manifests are in sample folder):
     GO111MODULE="on" go get sigs.k8s.io/kind@v0.5.1 && kind create cluster --config=samples/kind/kind.yaml
     export KUBECONFIG="$(kind get kubeconfig-path --name="kind")"
 - Let's wait until `coredns` pod stays on pending state and then execute this:
