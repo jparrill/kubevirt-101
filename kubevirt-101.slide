@@ -518,6 +518,11 @@ We only attach images in folders or block devices in /dev/ in the container to q
 .background img/background.png
 
 
+* Questions?
+.image img/question-img.png _ 850
+.background img/background.png
+
+
 * References
 
 *Kubevirt:*
@@ -561,10 +566,6 @@ We only attach images in folders or block devices in /dev/ in the container to q
 - [[https://github.com/kubernetes-sigs/krew/][Krew]]
 - [[https://github.com/kubernetes-sigs/kind][Kind]]
 
-.background img/background.png
-
-* Questions?
-.image img/question-img.png _ 850
 .background img/background.png
 
 
