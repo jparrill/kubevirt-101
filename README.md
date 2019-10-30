@@ -5,6 +5,10 @@ This repository will help you to understand KubeVirt is and how it works under t
 
 KubeVirt is a project that allows users to create and manage virtual machines within a Kubernetes cluster. It helps you to reduce complexity in your infrastructure to manage containers and VMs side by side with a single orchestration tool. 
 
+## Common Resources
+
+Common resources will point to the updated presentation with the latest changes. If you want to go to other past presentations like done at OpenSourceSummit 2019, just continue to **Conferences section**
+
 - Slides are on [go-talks.appspot.com](https://talks.godoc.org/github.com/jparrill/kubevirt-101/kubevirt-101.slide)
 - Source Code [here](https://github.com/jparrill/kubevirt-101)
 
