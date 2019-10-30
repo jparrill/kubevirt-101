@@ -1,0 +1,19 @@
+I0926 12:49:23.049666       1 importer.go:51] Starting importer
+I0926 12:49:23.050452       1 importer.go:107] begin import process
+I0926 12:49:23.938249       1 data-processor.go:252] Calculating available size
+I0926 12:49:23.944342       1 data-processor.go:260] Checking out file system volume size.
+I0926 12:49:23.944402       1 data-processor.go:264] Request image size not empty.
+I0926 12:49:23.944426       1 data-processor.go:269] Target size 500Mi.
+I0926 12:49:24.094165       1 data-processor.go:182] New phase: Convert
+I0926 12:49:24.094193       1 data-processor.go:188] Validating image
+I0926 12:49:26.217400       1 qemu.go:212] 0.00
+I0926 12:49:29.142315       1 qemu.go:212] 1.19
+
+I0926 12:49:38.990280       1 qemu.go:212] 96.83
+I0926 12:49:39.153217       1 qemu.go:212] 98.02
+I0926 12:49:39.156491       1 qemu.go:212] 99.21
+I0926 12:49:39.166935       1 data-processor.go:182] New phase: Resize
+I0926 12:49:39.187837       1 data-processor.go:245] Expanding image size to: 500Mi
+I0926 12:49:39.216723       1 data-processor.go:182] New phase: Complete
+I0926 12:49:39.216966       1 importer.go:160] Import complete
+
