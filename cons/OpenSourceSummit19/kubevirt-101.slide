@@ -1,0 +1,574 @@
+Kubevirt 101
+Learn the new way to operate VMs
+26 Sep 2019
+Tags: Kubevirt, K8s, VMs
+
+Juan Manuel Parrilla
+Senior Software Engineer, Red Hat
+jparrill@redhat.com
+https://github.com/jparrill/kubevirt-101
+@kerbeross
+
+* Kubevirt 101
+
+.image img/kubevirt-img.png
+.background img/background.png
+
+* About me
+
+- Programming enthusiast
+- Redhatter (~5 years)
+- Openshift/Kubernetes Lover
+
+.image img/avatar.jpg _ 250
+.caption [[https://github.com/jparrill/kubevirt-101][Kubevirt 101]] by Juan Manuel Parrilla
+.background img/background.png
+
+* Index
+
+- What is Kubevirt
+- Briefly Pod/Containers basics
+- Kubevirt Architecture
+- Kubevirt Components
+- Kubevirt External Components
+- Hands on Kubevirt, CDI, Multus and Rook
+- Understanding Kubevirt Networking
+- Understanding Kubevirt Storage
+
+.background img/background.png
+
+
+* Prologue
+.background img/background.png
+
+* What is kubevirt?
+
+.image img/at_last_together.png _ 950
+- _Virtual_Machine_management_addon_to_Kubernetes_that_extends_Kubernetes_in_a_way_that_allows_it_to_schedule_VM_workloads_side_by_side_with_container_workloads_.
+.background img/background.png
+
+* What is Kubevirt?
+
+- Why do we do KubeVirt?
+- Is there something wrong with RHV/oVirt?
+- Is there something wrong with OpenStack/RDO?
+.image img/question-img.png _ 550
+.background img/background.png
+
+* What is Kubevirt?
+
+- Why do we do KubeVirt?
+- Is there something wrong with RHV/oVirt?
+- Is there something wrong with OpenStack/RDO?
+.image img/question-img.png _ 250
+*There*is*nothing*wrong*with*RHV/oVirt*or*Openstack,*What*we*try*to*solve*is*providing*a*unified*stack*for*hybrid*cloud*operations*based*on*OpenShift/Kubernetes.*
+.background img/background.png
+
+* Virtual Machines as just another Workload
+
+** Some features of Kubevirt
+- KubeVirt is managed by Operators
+- KubeVirt is delivered via Pods, like any other k8s application.
+- KubeVirt is fully integrated into k8s control plane.
+- Normal kubectl/oc commands work with VMs too.
+- [[https://github.com/kubernetes-sigs/krew-index/blob/master/plugins/virt.yaml][Krew add-on]] to interact with VMs.
+.background img/background.png
+
+* K8s Basics
+
+** What are Containers?
+
+Containers mostly use two isolation techniques provided by the kernel:
+
+- cgroups
+- namespaces
+.image img/container.png _ 350
+.background img/background.png
+
+* K8s Basics
+
+** What are Pods?
+- Consists of one or more containers
+- Each container has its own cgroups
+- All containers of a pod share the network namespace
+
+Each container has for the rest its own namespace:
+
+- PID namespace
+- IPC namespace
+- Mount namespace
+
+.background img/background.png
+
+
+* K8s Basics
+.image img/kubevirt_pod.png _ 750 
+.background img/background.png
+
+* Kubevirt Architecture
+.background img/background.png
+
+* Kubevirt Architecture
+.image img/kubevirt_old_architecture_warning.png _ 700 
+.background img/background.png
+
+* Kubevirt Architecture
+- What if we don’t fight the kubelet?
+- What if we could simplify our lives by welcoming the fact that containers do a lot of security and isolation work for us?
+.image img/question-img.png _ 550
+.background img/background.png
+
+
+* Kubevirt Architecture
+How about starting one libvirt instance inside the container where the Virtual Machine is supposed to run in?
+We don’t have to trick libvirt or Kubernetes then in any way:
+
+- Kubernetes provides the resources
+- Libvirt runs inside the target pod and sees what it is supposed to see and what it can use for defining the Virtual Machine
+.background img/background.png
+
+* Kubevirt Architecture
+.image img/kubevirt_new_arch.png _ 550
+- Libvirt runs inside a container!
+.background img/background.png
+
+* Kubevirt Components
+.background img/background.png
+
+
+* Kubevirt Components Interaction
+.image img/kubevirt-components.png _ 900
+.background img/background.png
+
+* virt-api-server
+
+HTTP API server which serves as the entry point for all virtualization related flows.
+
+The API Server is taking care to update the virtualization related custom resource definition (see below).
+
+As the main entrypoint to KubeVirt it is responsible for defaulting and validation of the provided VMI CRDs.
+
+.background img/background.png
+
+* virt-api-server
+VMI definitions are kept as custom resource definitions inside the Kubernetes API server.
+
+The VMI definition is defining all properties of the Virtual machine itself, like:
+
+- Machine type
+- CPU type
+- Amount of RAM and vCPUs
+- Number and type of NICs
+- …
+
+.background img/background.png
+
+
+* virt-controller
+From a high-level perspective the virt-controller has all the cluster wide virtualization functionality.
+
+This controller is responsible for monitoring the VMI (CRDs) and managing the associated pods. Currently the controller will make sure to create and manage the life-cycle of the pods associated to the VMI objects.
+
+A VMI object will always be associated to a pod during it's life-time, however, due to i.e. migration of a VMI the pod instance might change over time.
+
+.background img/background.png
+
+* virt-handler
+Every host needs a single instance of virt-handler. It can be delivered as a DaemonSet.
+
+Like the virt-controller, the virt-handler is also reactive and is watching for changes of the VMI object, once detected it will perform all necessary operations to change a VMI to meet the required state.
+
+- Keep a cluster-level VMI spec in sync with a corresponding libvirt domain.
+- Report domain state and spec changes to the cluster.
+- Invoke node-centric plugins which can fulfill networking and storage requirements defined in VMI specs.
+
+.background img/background.png
+
+
+* virt-launcher
+The main purpose of the virt-launcher Pod is to provide the cgroups and namespaces, which will be used to host the VMI process.
+
+virt-handler signals virt-launcher to start a VMI by passing the VMI's CRD object to virt-launcher. virt-launcher then uses a local libvirtd instance within its container to start the VMI. From there virt-launcher monitors the VMI process and terminates once the VMI has exited.
+
+.background img/background.png
+
+
+* libvirtd
+An instance of libvirtd is present in every VMI pod. virt-launcher uses libvirtd to manage the life-cycle of the VMI process.
+
+.image img/libvirt-logo.png _ 650
+.background img/background.png
+
+* Kubevirt Additional Components
+.background img/background.png
+
+* CDI - Containerized Data Importer
+
+Containerized-Data-Importer (CDI) is a persistent storage management add-on for Kubernetes
+
+It's primary goal is to provide a declarative way to build Virtual Machine Disks on PVCs for Kubevirt VMs
+
+- Get your life easier using CDI
+- Works with standard core Kubernetes resources
+- Has an operator to manage the deployment + life-cycle
+- Storage device agnostic
+- Builds disk images for Kubevirt
+- Initializing your Kubernetes Volumes with data
+.background img/background.png
+
+
+* Multus
+
+Multus is a _meta_ CNI (Container Network Interface) plugin for Kubernetes that enables attaching multiple network interfaces to pods.
+
+- Allows multiple CNIs to coexist
+- Allows for a pod to use the right cni plugin for its networking needs
+
+.image img/multus-arch.png
+.background img/background.png
+
+* Hands on Kubevirt
+.background img/background.png
+
+
+* Hands on Kubevirt: K8s
+
+Let's do some assumption:
+
+- We have a K8s Cluster up and Running....ok if not just write down this command (all the manifests are in sample folder):
+    GO111MODULE="on" go get sigs.k8s.io/kind@v0.5.1 && kind create cluster --config=samples/kind/kind.yaml
+    export KUBECONFIG="$(kind get kubeconfig-path --name="kind")"
+- Let's wait until `coredns` pod stays on pending state and then execute this:
+    kubectl create -f samples/kind/kube-flannel.yaml
+- We have already a SC pre-defined on the cluster and as a default one, let put it as a non default in order to let _hostpath_provisioner_ to do this job:
+    kubectl patch storageclass standard -p '{"metadata": {"annotations":{"storageclass.beta.kubernetes.io/is-default-class":"false"}}}'
+- Now it's time to install Kubevirt...
+.background img/background.png
+
+
+* Hands on Kubevirt: Kubevirt
+- Execute those commands in order to install Kubevirt
+.code samples/install-kubevirt.sh
+- Check how it's going...
+	# kubectl get pods -n kubevirt
+.image img/pods_kubevirt.png
+.background img/background.png
+
+* Hands on Kubevirt: CDI
+Ok now we have Kubevirt installed and working.
+
+- Let's install CDI
+.code samples/install-cdi.sh
+- Check how it's going...
+	# kubectl get pods -n cdi
+.background img/background.png
+
+* Hands on Kubevirt: CDI
+- This is how should looks like the pods 
+.image img/pods_cdi.png
+Once both are installed we will create a PVC which will use CDI to import a cirros image into it:
+.code -edit samples/use-cdi.sh /^# Import/,/cirros-pvc.yaml/ 
+- This is the importation process:
+.image img/pod_import.png
+.background img/background.png
+
+* Hands on Kubevirt: CDI
+- And this is the importer pod's log:
+.code samples/cdi_import.log
+.background img/background.png
+
+
+* Hands on Kubevirt: VMs
+- Now we need to create the VM:
+.code -edit samples/use-cdi.sh /^# Create/,/cirros-vm.yaml/ 
+- And this is how looks like the VM process:
+    NAME                            READY   STATUS    RESTARTS   AGE
+    virt-launcher-vm-cirros-p68f5   0/1     Running   0          10s
+
+- VM:
+    NAME        AGE     RUNNING   VOLUME
+    vm-cirros   3m38s   true      
+
+
+- VMI:
+    NAME        AGE     PHASE     IP            NODENAME
+    vm-cirros   3m10s   Running   10.244.0.21   kind-control-plane
+
+.background img/background.png
+
+* Hands on Kubevirt: Multus
+
+In order to work with multus we need to understand a couple of things about our platform (Kind) and how it works by default. 
+
+Kind works with a net plugin called Kindnet and it's not compatible directly with multus, in order to fix this, we need to raise up a kind cluster without Network config, and once booted up, install flannel as we did before. 
+
+This way Flannel could use Multus as CNI without compatibility problems.
+
+.image img/cni-logo.png _ 250
+.background img/background.png
+
+* Hands on Kubevirt: Multus
+Testing Multus (manifests on _samples/cnao_ folder):
+
+- Install the necessary elements to make the operator works:
+.code -edit samples/install-cnao.sh /^# Install/,/operator.yaml/ 
+
+- Deploy the CR with Network Addons configuration:
+.code -edit samples/install-cnao.sh /^# Deploy/,/cr.yaml/ 
+
+- This should be the final shape:
+.image img/cnao_pods.png
+.background img/background.png
+
+* Hands on Kubevirt: Multus
+Now we need to tweak a bit the control plane node and also the DaemonSet in order to make Multus work fine with Kind (by default it's not prepared for debian based OS):
+
+- We need to get inside the docker container and install OVS
+    docker exec -it kind-control-plane /bin/bash
+    apt update -y
+    apt install openvswitch-common openvswitch-switch -y
+    systemctl start openvswitch-switch
+
+- Now we need to patch ovs-cni-amd64 DS
+    kubectl edit ds -n cluster-network-addons ovs-cni-amd64
+
+- Introduce this changes:
+
+    path: /run/openvswitch                ->  path: /var/run/openvswitch
+    mountPath: /host/run/openvswitch      ->  mountPath: /var/run/openvswitch
+    unix:///host/run/openvswitch/db.sock  ->  /var/run/openvswitch/db.sock
+
+.background img/background.png
+
+* Hands on Kubevirt: Multus
+Once the DS is patched, the pod will be terminated and the new version will raise up, now we need to create a BR manually because Kind image has not NetworkManager that nmstate operator could handle:
+    
+    docker exec -it kind-control-plane /bin/bash
+    ovs-vsctl add-br br1
+    exit
+
+- Once BR is deployed on Kind host, let's create a the NetworkAttachementDefinition:
+    kubectl create -f sample/multus/multus_nad_br1.yaml
+
+- And now a couple of VMs with multiples interfaces:
+    kubectl create -f sample/multus/vm_multus1.yaml
+    kubectl create -f sample/multus/vm_multus2.yaml
+.background img/background.png
+
+* Hands on Kubevirt: Multus
+
+Those are the pods:
+
+    NAME                                  READY   STATUS    RESTARTS   AGE
+    virt-launcher-fedora-multus-1-776r9   2/2     Running   0          23m
+    virt-launcher-fedora-multus-2-8jmtw   2/2     Running   0          2m18s
+
+- You could use _krew_ to login into one of them, and then see the interfaces
+    kubectl virt console fedora-multus-2
+
+- Output:
+    Fedora 29 (Cloud Edition)
+    Kernel 4.18.16-300.fc29.x86_64 on an x86_64 (ttyS0)
+    
+    fedora-multus-2 login: fedora
+    Password: 
+    Last login: Fri Sep 27 14:31:15 on ttyS0
+    [fedora@fedora-multus-2 ~]$ ip -o a | grep eth1
+    3: eth1    inet 11.0.0.6/24 brd 11.0.0.255 scope global noprefixroute eth1
+    3: eth1    inet6 fe80::feb4:3fee:a063:b595/64 scope link noprefixroute
+.background img/background.png
+
+
+* Hands on Kubevirt: Multus
+
+- This is the communication between both machines
+    [fedora@fedora-multus-2 ~]$ ping 11.0.0.6 -c2         # Ping to myself
+    PING 11.0.0.6 (11.0.0.6) 56(84) bytes of data.
+    64 bytes from 11.0.0.6: icmp_seq=1 ttl=64 time=0.047 ms
+    64 bytes from 11.0.0.6: icmp_seq=2 ttl=64 time=0.112 ms
+    
+    --- 11.0.0.6 ping statistics ---
+    2 packets transmitted, 2 received, 0% packet loss, time 3ms
+    rtt min/avg/max/mdev = 0.047/0.079/0.112/0.033 ms
+
+    [fedora@fedora-multus-2 ~]$ ping 11.0.0.5 -c2         # Ping to my neighbour
+    PING 11.0.0.5 (11.0.0.5) 56(84) bytes of data.
+    64 bytes from 11.0.0.5: icmp_seq=1 ttl=64 time=0.952 ms
+    64 bytes from 11.0.0.5: icmp_seq=2 ttl=64 time=0.435 ms
+    
+    --- 11.0.0.5 ping statistics ---
+    2 packets transmitted, 2 received, 0% packet loss, time 3ms
+    rtt min/avg/max/mdev = 0.435/0.693/0.952/0.259 ms
+.background img/background.png
+
+* Understanding Networking
+
+- Why we did all of this stuff just to communicate 2 VMs?
+- Why not use just Kindnet or flannel?
+- How Network Cluster Addons Operator could help me?
+.image img/question-img.png _ 550
+.background img/background.png
+
+
+* Understanding Networking
+If you just limit yourself to use Kindnet or Flannel you will miss many features that Multus could give, for instance, multi-network card per pod, this is extensible also for every pod, not just VMs.
+
+This also allows you to use w/e plugin compatible with CNI, you just need to tell multus that it needs to be managed with the proper manifest.
+
+The final architecture that we have in our deployment is the next:
+
+    - Flannel (as K8s default SDN)
+    - Multus (as additional CNI Plugin)
+    - Openvswitch (as a plugin connected to be used by Multus)
+    - Linux Bridge (as a plugin connected to be used by Multus)
+    - NMState (as a plugin connected, but not used by Multus in our case)
+    - Bridge Maker (as a plugin connected, but not used by Multus in our case)
+
+.background img/background.png
+
+
+* Understanding Networking
+
+Network Cluster Addons Operator will help you:
+
+- Installing all the necessary plugins that Multus will need for cni (like ovs-vsctl to manage openvswitch bridges)
+- Creating host elements but just defined through CR's
+- It has some requirements like NetworkManager or others depending on the plugin (OVS needs openvswitch up and running)
+
+.image img/network-logo.png _ 550
+.background img/background.png
+
+* Hands on Kubevirt: Rook
+
+Rook is a storage plugin that allows you to deploy and manage (mainly, in our case) a well replicated Ceph cluster. It's based (as Kubevirt) on CRD's and CR's and managed by a operator.
+
+A good way to play with it is to work with this repository: [[https://github.com/rook/rook][https://github.com/rook/rook]] more concretelly the [[https://github.com/rook/rook/blob/master/cluster/examples/kubernetes/ceph/cluster-minimal.yaml][examples folder]]. It's self explanatory, you just need to create the _common.yaml_, _operator.yaml_ and at the end the _cluster-test.yaml_.
+
+Rook will look for an empty disks to work with, It needs it to deploy the OSD and store the data.
+
+.image img/rook-logo.png _ 200
+.background img/background.png
+
+* Hands on Kubevirt: Rook
+In order to use Rook with kind we need to emulate a SCSI drive on our system and it's not possible using an empty loop device, we recommend to use Minikube following the [[Rook.io][Rook Tutorial in their home page]]
+
+- [[https://rook.io/docs/rook/v1.1/k8s-pre-reqs.html][Rook Pre-Reqs]]
+- [[https://rook.io/docs/rook/v1.1/ceph-quickstart.html][Ceph Quickstart]]
+
+This is why Rook does not support Loop devices as correct ones [[https://github.com/rook/rook/blob/master/pkg/util/sys/device.go#L176-L177][devices.go]]:
+
+    if ok && cmdErr.ExitStatus() == 32 {
+        // certain device types (such as loop) return exit status 32 when probed further,
+        // ignore and continue without logging
+        return map[string]string{}, nil
+    }
+
+.background img/background.png
+
+
+* Hands on Kubevirt: Rook
+On a VM should looks like this:
+
+.image img/rook-pods.png
+.background img/background.png
+
+The important parts are _rook-ceph-osd-X-XXXXX-XXX_ which means that the OSD is up and running, the others like _rook-ceph-mon-X-XXXXX-XXX_ and _rook-ceph-mgr-X-XXXXX-XXX_ are also important to the Ceph cluster.
+
+* Hands on Kubevirt: Rook
+In order to load the SC just put those commands:
+
+    kubectl create -f csi/cephfs/storageclass.yaml
+    kubectl create -f csi/rbd/storageclass-test.yaml
+
+And we also recommend to load the Toolbox pod, which allow you to troubleshoot the cluster:
+
+    kubectl create -f toolbox.yaml
+
+.image img/rook-sc.png
+
+Now we just need to create some PVCs, and the PVs will raise up by the CSI provisioner:
+
+    kubectl create -f csi/rbd/pvc.yaml
+.background img/background.png
+
+
+* Hands on Kubevirt: Rook
+
+This is how Rook and CSI will create the PVCs and PVs on K8s
+.image img/rook-pvc.png _ 1000
+
+And to use the PVC is just to create a Deployment, Pod, w/e you need just pointing to the PVC:
+
+.image img/rook-pvc-desc.png
+
+.background img/background.png
+
+* Understanding Storage
+
+In our case, CDI takes care about the storage part with a hostpath provisioner (just for development), if we want to deal with a real environment we need to work with [[https://rook.io][Rook]] and using [[https://rook.io/docs/rook/v1.1/ceph-quickstart.html][Ceph as a Backend]].
+
+Here what k8s provides:
+
+- Filesystem support (kubelet provides volumes mounted in specific folders
+- Block device support (kubelet provides block devices in /dev/ inside the container)
+- Support for arbitrary storage providers via CSI (Container Storage Interface)
+
+We only attach images in folders or block devices in /dev/ in the container to qemu.
+
+.background img/background.png
+
+
+* Questions?
+.image img/question-img.png _ 850
+.background img/background.png
+
+
+* References
+
+*Kubevirt:*
+
+- [[http://kubevirt.io/][Kubevirt.io]]
+- [[https://github.com/kubevirt/kubevirt/blob/master/docs/components.md][Kubevirt VM Creation Flow]]
+- [[https://github.com/kubevirt/kubevirtci][KubevirtCI]]
+- [[https://github.com/kubevirt/kubevirt/tree/master/pkg/virt-operator][Kubevirt Operator]]
+- [[https://github.com/kubevirt/kubevirt-tutorial][Kubevirt Tutorial]]
+- [[https://github.com/kubevirt/hyperconverged-cluster-operator][HCO]]
+- [[https://kubevirt.io/user-guide/docs/latest/welcome/index.html][Kubevirt Documentation]]
+
+.background img/background.png
+
+* References
+
+*CDI*:
+
+- [[https://github.com/kubevirt/containerized-data-importer][CDI]]
+- [[https://kubevirt.io/2018/containerized-data-importer.html][CDI - How to]]
+- [[https://kubevirt.io/labs/kubernetes/lab2][CDI Laboratory]]
+
+*Multus*
+
+- [[https://kubevirt.io/2018/attaching-to-multiple-networks.html][Multus - How to]]
+- [[https://github.com/kubevirt/ovs-cni][OVS-CNI Plugin]]
+- [[https://github.com/kubevirt/cluster-network-addons-operator][Cluster Network Addons Operator]]
+
+.background img/background.png
+
+* References
+
+*Rook*
+
+- [[https://rook.io/][Rook]]
+- [[https://rook.io/docs/rook/v1.1/ceph-quickstart.html][Rook Quickstart]]
+- [[https://ember-csi.ioo][EmberCSI]]
+
+*K8s*
+
+- [[https://github.com/kubernetes-sigs/krew/][Krew]]
+- [[https://github.com/kubernetes-sigs/kind][Kind]]
+
+.background img/background.png
+
+
+* Thank you!!
+.background img/background.png
+

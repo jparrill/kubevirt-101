@@ -17,3 +17,7 @@ cd kubevirt-101
 present
 ```
 
+## Conferences
+
+- [Open Source Summit 2019](https://talks.godoc.org/github.com/jparrill/kubevirt-101/cons/OpenSourceSummit19/kubevirt-101.slide)
+
